@@ -1,5 +1,7 @@
 # emptyblog-app
 
+![example workflow](https://github.com/mysticaldream/emptyblog-app/actions/workflows/deploy.yaml/badge.svg?branch=main)
+
 ## Project setup
 ```
 npm install

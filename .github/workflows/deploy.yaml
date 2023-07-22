@@ -1,0 +1,111 @@
+name: Deploy Vue project to remote server
+on:
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: "Log level"
+        required: true
+        default: "warning"
+        type: choice
+        options:
+          - info
+          - warning
+          - debug
+      tags:
+        description: "测试场景标签"
+        required: false
+        type: boolean
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ vars.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run lint
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_DIR: ${{ vars.DEPLOYDIR_PATH }}/app
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ vars.NODE_VERSION }}
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Remove previous directory
+        uses: appleboy/ssh-action@v0.1.10
+        env:
+          SUPER_SECRET: ${{ secrets.PASSWORD }}
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          port: ${{ secrets.PORT }}
+          envs: SUPER_SECRET,DEPLOY_DIR
+          script: |
+            docker compose -f "$DEPLOY_DIR/docker/docker-compose.yaml" down
+            echo "$SUPER_SECRET" | sudo -S rm -rf "$DEPLOY_DIR"
+
+      - name: Copy dist files to remote server
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          port: ${{ secrets.PORT }}
+          source: "dist/*"
+          target: ${{ env.DEPLOY_DIR}}
+
+      - name: Copy docker files to remote server
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          port: ${{ secrets.PORT }}
+          source: "docker/*"
+          target: ${{ env.DEPLOY_DIR}}
+
+      - name: Deploy with docker compose on remote server
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          port: ${{ secrets.PORT }}
+          envs: DEPLOY_DIR
+          script: |
+            cd "$DEPLOY_DIR/docker"
+            docker compose up -d
