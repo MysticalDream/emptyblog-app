@@ -2,19 +2,10 @@ name: Deploy Vue project to remote server
 on:
   workflow_dispatch:
     inputs:
-      logLevel:
-        description: "Log level"
+      reason:
+        description: "The reason for running the workflow"
         required: true
-        default: "warning"
-        type: choice
-        options:
-          - info
-          - warning
-          - debug
-      tags:
-        description: "测试场景标签"
-        required: false
-        type: boolean
+        default: "Manual build from GitHub UI"
   push:
     branches:
       - main
